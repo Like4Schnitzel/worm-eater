@@ -1,7 +1,9 @@
 const fs = require('fs');
+const cron = require('cron');
 const configFileName = './config.json';
 const configFile = require(configFileName);
 const { Client, Events, GatewayIntentBits } = require('discord.js');
+const unixDay = 86400;
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
@@ -34,5 +36,34 @@ client.on(Events.MessageCreate, (message) => {
     }
 })
 
+// send message giving an update on abstinence every day at 6am
+// also resets daily worm count for everyone
+const scheduledSuccessMessages = new cron.CronJob("0 6 * * *", () => {
+    console.log("Called scheduledSuccessMessages.");
+    // unix timestamp for right now
+    const currentTime = Math.floor(Date.now() / 1000);
+
+    for (const id of configFile.successMessageChannels) {
+        const channel = client.channels.cache.get(id);
+        for (const person of configFile.wormedPeople) {
+            const daysWithoutWorms = Math.floor((currentTime - person.latestWorm) / unixDay);
+            if (daysWithoutWorms >= 1) {
+                channel.send(
+                    "<@" +
+                    person.id +
+                    ">, you've spent " +
+                    daysWithoutWorms + 
+                    " whole days without brainworms! Good job, keep it up!! Be proud of yourself!!"
+                );
+            }
+        }
+    }
+
+    for (const person of configFile.wormedPeople) {
+        person.wormsToday = 0;
+    }
+    updateConfig();
+});
+scheduledSuccessMessages.start();
+
 client.login(configFile.token);
-console.log("List of worms: " + configFile.worms);
