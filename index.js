@@ -1,14 +1,19 @@
 const fs = require('fs');
 const cron = require('cron');
-const configFileName = './config.json';
-const configFile = require(configFileName);
+const configFile = require('./config.json');
 const { Client, Events, GatewayIntentBits } = require('discord.js');
-const unixDay = 86400;
+const unixDay = 86400000;  // amount of miliseconds in a day
+let db;
+try {
+    db = require('./db.json')
+} catch {
+    db = {}
+}
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
-function updateConfig() {
-    fs.writeFile(configFileName, JSON.stringify(configFile, null, 4), function writeJSON(err) {
+function updateDB() {
+    fs.writeFile('./db.json', JSON.stringify(db, null, 4), function writeJSON(err) {
         if (err) return console.log(err);
     })
 }
@@ -24,10 +29,18 @@ client.on(Events.MessageCreate, (message) => {
             // check if it contains any worms
             for (const worm of configFile.worms) {
                 if (message.content.toUpperCase().replace(/[^A-Z ]/g, '').split(' ').includes(worm.toUpperCase())) {
-                    person.latestWorm = message.createdTimestamp;
-                    person.wormsToday++;
-                    message.reply(person.badResponse + " This is worm number " + person.wormsToday + " of the day.");
-                    updateConfig();
+                    // check if a db entry for this person already exists
+                    // if not, create one
+                    if (!db[person.id]) {
+                        db[person.id] = {
+                            latestWorm: 0,
+                            wormsToday: 0
+                        }
+                    }
+                    db[person.id].latestWorm = message.createdTimestamp;
+                    db[person.id].wormsToday++;
+                    message.reply(person.badResponse + " This is worm number " + db[person.id].wormsToday + " of the day.");
+                    updateDB();
                     break;
                 }
             }
@@ -41,28 +54,29 @@ client.on(Events.MessageCreate, (message) => {
 const scheduledSuccessMessages = new cron.CronJob("0 6 * * *", () => {
     console.log("Called scheduledSuccessMessages.");
     // unix timestamp for right now
-    const currentTime = Math.floor(Date.now() / 1000);
+    const currentTime = Date.now();
 
     for (const id of configFile.successMessageChannels) {
         const channel = client.channels.cache.get(id);
         for (const person of configFile.wormedPeople) {
-            const daysWithoutWorms = Math.floor((currentTime - person.latestWorm) / unixDay);
-            if (daysWithoutWorms >= 1) {
-                channel.send(
-                    "<@" +
-                    person.id +
-                    ">, you've spent " +
-                    daysWithoutWorms + 
-                    " whole days without brainworms! Good job, keep it up!! Be proud of yourself!!"
-                );
+            if (db[person.id]) {
+                const daysWithoutWorms = Math.floor((currentTime - db[person.id].latestWorm) / unixDay);
+                if (daysWithoutWorms >= 1) {
+                    channel.send(
+                        configFile.successMessage
+                            .replace("{ping}", "<@" + person.id + ">")
+                            .replace("{time}", daysWithoutWorms)
+                    );
+                }
             }
         }
     }
 
     for (const person of configFile.wormedPeople) {
-        person.wormsToday = 0;
+        if (db[person.id])
+            db[person.id].wormsToday = 0;
     }
-    updateConfig();
+    updateDB();
 });
 scheduledSuccessMessages.start();
 
