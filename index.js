@@ -23,7 +23,7 @@ client.on(Events.MessageCreate, (message) => {
         if (message.author.id === person.id) {
             // check if it contains any worms
             for (const worm of configFile.worms) {
-                if (message.content.toUpperCase().includes(worm.toUpperCase())) {
+                if (message.content.toUpperCase().split(' ').includes(worm.toUpperCase())) {
                     person.latestWorm = message.createdTimestamp;
                     person.wormsToday++;
                     message.reply(person.badResponse + " This is worm number " + person.wormsToday + " of the day.");
