@@ -26,7 +26,7 @@ Each day at 6am the bot checks if a user to watch has had a streak of 1 day or l
                 "badResponse": "Don't say that word! It's bad for you!",
             }
         ],
-        "successMessage": "Good job, {ping}, you've spent {time} without saying a bad word!",
+        "successMessage": "Good job, {ping}, you've spent {time} days without saying a bad word!",
         "successMessageChannels": [
             "0123456789012345678",
             "1234567890123456789"
