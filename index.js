@@ -1,13 +1,12 @@
-const fs = require('fs');
-const cron = require('cron');
-const configFile = require('./config.json');
-const { Client, Events, GatewayIntentBits } = require('discord.js');
+import fs from 'fs';
+import cron from 'cron';
+import { Client, Events, GatewayIntentBits } from 'discord.js';
+import configFile from './config.json' assert { type: 'json' };
+const db = fs.existsSync('./db.json') ? JSON.parse(fs.readFileSync('./db.json', { encoding: 'utf8' })) : {};
 const unixDay = 86400000;  // amount of miliseconds in a day
-let db;
-try {
-    db = require('./db.json')
-} catch {
-    db = {}
+
+for (let i = 0; i < configFile.worms.length; i++) {
+    configFile.worms[i] = configFile.worms[i].toUpperCase();
 }
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
@@ -27,22 +26,20 @@ client.on(Events.MessageCreate, (message) => {
     for (const person of configFile.wormedPeople) {
         if (message.author.id === person.id) {
             // check if it contains any worms
-            for (const worm of configFile.worms) {
-                if (message.content.toUpperCase().replace(/[^A-Z ]/g, '').split(' ').includes(worm.toUpperCase())) {
-                    // check if a db entry for this person already exists
-                    // if not, create one
-                    if (!db[person.id]) {
-                        db[person.id] = {
-                            latestWorm: 0,
-                            wormsToday: 0
-                        }
+            if (message.content.toUpperCase().replace(/[^A-Z ]/g, '').split(' ').some((v) => configFile.worms.includes(v))) {
+                // check if a db entry for this person already exists
+                // if not, create one
+                if (!db[person.id]) {
+                    db[person.id] = {
+                        latestWorm: 0,
+                        wormsToday: 0
                     }
-                    db[person.id].latestWorm = message.createdTimestamp;
-                    db[person.id].wormsToday++;
-                    message.reply(person.badResponse + " This is worm number " + db[person.id].wormsToday + " of the day.");
-                    updateDB();
-                    break;
                 }
+                db[person.id].latestWorm = message.createdTimestamp;
+                db[person.id].wormsToday++;
+                message.reply(person.badResponse + " This is worm number " + db[person.id].wormsToday + " of the day.");
+                updateDB();
+                break;
             }
             break;
         }
